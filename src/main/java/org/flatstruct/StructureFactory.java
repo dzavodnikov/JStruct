@@ -16,12 +16,16 @@
 package org.flatstruct;
 
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
+import java.util.HashSet;
+import java.util.Set;
 
 import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtField;
-import javassist.CtNewMethod;
 import javassist.NotFoundException;
 
 /**
@@ -31,21 +35,88 @@ public class StructureFactory<T> extends Factory<T> {
 
     private final static String FACTORY_NAME = "Structure";
 
-    // FIXME
-    private static final String X_FIELD = "x";
-    private static final String Y_FIELD = "y";
+    private final int modifiers;
 
-    public StructureFactory(final ClassPool pool) {
+    public StructureFactory(final ClassPool pool, final int... modifiers) {
         super(pool);
+
+        // Join modifiers in one integer.
+        int join = 0;
+        for (int m : modifiers) {
+            join |= m;
+        }
+        this.modifiers = join;
+    }
+
+    /**
+     * @param modifiers field default <a href=
+     *                  "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/reflect/Modifier.html">modifiers</a>.
+     */
+    public StructureFactory(final int... modifiers) {
+        this(ClassPool.getDefault(), modifiers);
     }
 
     public StructureFactory() {
-        super();
+        this(Modifier.PRIVATE);
     }
 
     @Override
     public String getFactoryName() {
         return FACTORY_NAME;
+    }
+
+    protected void addField(final CtClass ctClass, final Set<String> createdFields,
+            final Class<?> fieldType, final String fieldName) throws NotFoundException, CannotCompileException {
+        final CtField field = new CtField(getClassPool().getCtClass(fieldType.getName()), fieldName, ctClass);
+        field.setModifiers(this.modifiers);
+
+        if (!createdFields.contains(fieldName)) {
+            createdFields.add(fieldName);
+
+            ctClass.addField(field);
+        }
+    }
+
+    protected void initializeClass(final CtClass ctClass, final Class<T> classDef)
+            throws CannotCompileException, NotFoundException {
+        final Set<String> createdFields = new HashSet<>();
+
+        for (Method method : classDef.getMethods()) {
+            final MethodBuilder mb = new MethodBuilder(method.getName());
+            mb.addModifier("public");
+
+            boolean wasAnnotated = false;
+
+            for (Parameter param : method.getParameters()) {
+                final Setter setterAnnotation = param.getAnnotation(Setter.class);
+                if (setterAnnotation != null) {
+                    wasAnnotated = true;
+
+                    final String fieldName = setterAnnotation.value();
+
+                    addField(ctClass, createdFields, param.getType(), fieldName);
+
+                    mb.addArgument(param);
+                    mb.addBodyLine("this.%s = %s;", fieldName, param.getName());
+                }
+            }
+
+            final Getter getterAnnotation = method.getAnnotation(Getter.class);
+            if (getterAnnotation != null) {
+                wasAnnotated = true;
+
+                final String fieldName = getterAnnotation.value();
+
+                addField(ctClass, createdFields, method.getReturnType(), fieldName);
+
+                mb.setReturnType(method.getReturnType());
+                mb.addBodyLine("return this.%s;", fieldName);
+            }
+
+            if (wasAnnotated) {
+                mb.addMethodTo(ctClass);
+            }
+        }
     }
 
     @Override
@@ -56,21 +127,7 @@ public class StructureFactory<T> extends Factory<T> {
             final CtClass ctClass = getClassPool().makeClass(createClassName(classDef));
             ctClass.addInterface(getClassPool().getCtClass(classDef.getName()));
 
-            // Internal fields.
-            ctClass.addField(new CtField(CtClass.intType, X_FIELD, ctClass));
-            ctClass.addField(new CtField(CtClass.intType, Y_FIELD, ctClass));
-
-            // Getter for X.
-            ctClass.addMethod(CtNewMethod.make("public int getX() { return this.x; }", ctClass));
-
-            // Setter for X.
-            ctClass.addMethod(CtNewMethod.make("public void setX(int x) { this.x = x; }", ctClass));
-
-            // Getter for Y.
-            ctClass.addMethod(CtNewMethod.make("public int getY() { return this.y; }", ctClass));
-
-            // Setter for Y.
-            ctClass.addMethod(CtNewMethod.make("public void setY(int y) { this.y = y; }", ctClass));
+            initializeClass(ctClass, classDef);
 
             ctClass.detach();
             return ctClass.toClass(classDef);

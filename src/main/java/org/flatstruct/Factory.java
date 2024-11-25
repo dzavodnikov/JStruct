@@ -15,10 +15,16 @@
  */
 package org.flatstruct;
 
+import java.lang.reflect.Parameter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import javassist.CannotCompileException;
 import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtNewMethod;
 
 /**
  * Base class for all factories.
@@ -84,5 +90,65 @@ public abstract class Factory<T> {
             CLASS_IMPL_CACHE.put(classDef, classImpl);
         }
         return (Class<T>) classImpl;
+    }
+
+    /**
+     * Helper class that simplify generation new methods.
+     */
+    public static class MethodBuilder {
+
+        private final List<String> modifiers = new ArrayList<String>();
+
+        private String returnType = "void";
+
+        private final String name;
+
+        private final List<String> arguments = new ArrayList<String>();
+
+        private final List<String> body = new ArrayList<String>();
+
+        public MethodBuilder(final String name) {
+            this.name = name;
+        }
+
+        public void addModifier(final String modifier) {
+            this.modifiers.add(modifier);
+        }
+
+        public void setReturnType(final Class<?> returnType) {
+            this.returnType = returnType.getName();
+        }
+
+        public void addArgument(final Class<?> argType, final String argName) {
+            this.arguments.add(String.format("%s %s", argType.getName(), argName));
+        }
+
+        public void addArgument(final Parameter parameter) {
+            addArgument(parameter.getType(), parameter.getName());
+        }
+
+        public void addBodyLine(final String line, final Object... vars) {
+            final String fmtLine = String.format(line, vars);
+            this.body.add(String.format("    %s", fmtLine));
+        }
+
+        protected String buildMethod() {
+            final List<String> all = new ArrayList<>();
+            all.add(String.join(" ", this.modifiers));
+            all.add(" ");
+            all.add(this.returnType);
+            all.add(" ");
+            all.add(this.name);
+            all.add("(");
+            all.add(String.join(", ", this.arguments));
+            all.add(") {\n");
+            all.add(String.join("\n", this.body));
+            all.add("\n}");
+            return String.join("", all);
+        }
+
+        public void addMethodTo(final CtClass ctClass) throws CannotCompileException {
+            ctClass.addMethod(CtNewMethod.make(buildMethod(), ctClass));
+        }
     }
 }

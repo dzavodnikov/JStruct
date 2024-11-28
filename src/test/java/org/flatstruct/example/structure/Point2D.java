@@ -15,6 +15,7 @@
  */
 package org.flatstruct.example.structure;
 
+import org.flatstruct.Field;
 import org.flatstruct.Getter;
 import org.flatstruct.Setter;
 
@@ -23,7 +24,10 @@ import org.flatstruct.Setter;
  */
 public interface Point2D {
 
+    @Field(int.class)
     String X_FIELD_NAME = "x";
+
+    @Field(int.class)
     String Y_FIELD_NAME = "y";
 
     void setX(@Setter(X_FIELD_NAME) int x);
@@ -35,4 +39,10 @@ public interface Point2D {
 
     @Getter(Y_FIELD_NAME)
     int getY();
+
+    @Getter(X_FIELD_NAME)
+    int setXY(@Setter(X_FIELD_NAME) int x, @Setter(Y_FIELD_NAME) int y);
+
+    @Getter(Y_FIELD_NAME)
+    int setYX(@Setter(Y_FIELD_NAME) int y, @Setter(X_FIELD_NAME) int x);
 }

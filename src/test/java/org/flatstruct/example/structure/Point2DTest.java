@@ -51,5 +51,13 @@ public class Point2DTest {
         point.setY(3);
         assertEquals(2, point.getX());
         assertEquals(3, point.getY());
+
+        assertEquals(4, point.setXY(4, 5));
+        assertEquals(4, point.getX());
+        assertEquals(5, point.getY());
+
+        assertEquals(7, point.setYX(7, 6));
+        assertEquals(6, point.getX());
+        assertEquals(7, point.getY());
     }
 }

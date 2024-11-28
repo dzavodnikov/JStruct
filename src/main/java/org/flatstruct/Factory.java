@@ -70,6 +70,36 @@ public abstract class Factory<T> {
         }
     }
 
+    protected void verifyFieldType(final java.lang.reflect.Field field) {
+        final java.lang.reflect.Type fieldDefType = field.getGenericType();
+        if (fieldDefType != String.class) {
+            throw new RuntimeException("Incorrect field definition: constant should be the String");
+        }
+    }
+
+    protected String getFieldName(final Map<String, Class<?>> fields, final java.lang.reflect.Field field) {
+        try {
+            final String fieldName = (String) field.get(null);
+            if (fieldName == null) {
+                throw new RuntimeException("Incorrect field definition: name can't be null");
+            }
+            if (fields.containsKey(fieldName)) {
+                throw new RuntimeException(String.format("Duplicate field name '%s'", fieldName));
+            }
+            return fieldName;
+        } catch (IllegalArgumentException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected Class<?> getFieldType(final Field fieldMeta) {
+        final Class<?> fieldType = fieldMeta.value();
+        if (fieldType == null) {
+            throw new RuntimeException("Incorrect field definition: type can't be null");
+        }
+        return fieldType;
+    }
+
     /**
      * @param classDef describes how to data should be located into the memory;
      * @return created class implementation based on class definition.

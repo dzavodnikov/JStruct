@@ -13,30 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.flatstruct.example.structure;
+package org.flatstruct;
 
-import org.flatstruct.Field;
-import org.flatstruct.Getter;
-import org.flatstruct.Setter;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Testing structure.
+ * Define the field.
  */
-public interface Person {
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.FIELD)
+public @interface Field {
 
-    @Field(value = String.class, isVolatile = true)
-    String NAME_FIELD_NAME = "name";
+    Class<?> value();
 
-    @Field(value = int.class, isVolatile = true)
-    String AGE_FIELD_NAME = "age";
-
-    void setName(@Setter(NAME_FIELD_NAME) String name);
-
-    @Getter(NAME_FIELD_NAME)
-    String getName();
-
-    void setAge(@Setter(AGE_FIELD_NAME) int age);
-
-    @Getter(AGE_FIELD_NAME)
-    int getAge();
+    boolean isVolatile() default false;
 }

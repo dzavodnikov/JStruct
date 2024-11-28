@@ -19,8 +19,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 import javassist.CannotCompileException;
 import javassist.ClassPool;
@@ -35,29 +35,12 @@ public class StructureFactory<T> extends Factory<T> {
 
     private final static String FACTORY_NAME = "Structure";
 
-    private final int modifiers;
-
-    public StructureFactory(final ClassPool pool, final int... modifiers) {
+    public StructureFactory(final ClassPool pool) {
         super(pool);
-
-        // Join modifiers in one integer.
-        int join = 0;
-        for (int m : modifiers) {
-            join |= m;
-        }
-        this.modifiers = join;
-    }
-
-    /**
-     * @param modifiers field default <a href=
-     *                  "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/reflect/Modifier.html">modifiers</a>.
-     */
-    public StructureFactory(final int... modifiers) {
-        this(ClassPool.getDefault(), modifiers);
     }
 
     public StructureFactory() {
-        this(Modifier.PRIVATE);
+        this(ClassPool.getDefault());
     }
 
     @Override
@@ -65,22 +48,46 @@ public class StructureFactory<T> extends Factory<T> {
         return FACTORY_NAME;
     }
 
-    protected void addField(final CtClass ctClass, final Set<String> createdFields,
-            final Class<?> fieldType, final String fieldName) throws NotFoundException, CannotCompileException {
-        final CtField field = new CtField(getClassPool().getCtClass(fieldType.getName()), fieldName, ctClass);
-        field.setModifiers(this.modifiers);
+    protected void initializeFields(final CtClass ctClass, final Map<String, Class<?>> fields,
+            final Class<T> classDef) throws NotFoundException, CannotCompileException {
+        for (java.lang.reflect.Field field : classDef.getFields()) {
+            if (field.isAnnotationPresent(Field.class)) {
+                final Field fieldMeta = field.getAnnotation(Field.class);
 
-        if (!createdFields.contains(fieldName)) {
-            createdFields.add(fieldName);
+                verifyFieldType(field);
 
-            ctClass.addField(field);
+                final String fieldName = getFieldName(fields, field);
+                final Class<?> fieldType = getFieldType(fieldMeta);
+                fields.put(fieldName, fieldType);
+
+                int modifiers = Modifier.PRIVATE;
+                modifiers |= fieldMeta.isVolatile() ? Modifier.VOLATILE : 0;
+
+                final CtField ctField = new CtField(
+                        getClassPool().getCtClass(fieldType.getName()),
+                        fieldName,
+                        ctClass);
+                ctField.setModifiers(modifiers);
+                ctClass.addField(ctField);
+            }
         }
     }
 
-    protected void initializeClass(final CtClass ctClass, final Class<T> classDef)
-            throws CannotCompileException, NotFoundException {
-        final Set<String> createdFields = new HashSet<>();
+    private void verifyFieldType(final Map<String, Class<?>> fields, final String fieldName,
+            final Class<?> expectedType) {
+        final Class<?> fieldType = fields.get(fieldName);
+        if (fieldType == null) {
+            throw new RuntimeException(String.format("Field '%s' is not exists", fieldName));
+        }
 
+        if (!fieldType.equals(expectedType)) {
+            throw new RuntimeException(String.format("Field '%s' has type %s instead of %s",
+                    fieldName, fieldType.getName(), expectedType.getName()));
+        }
+    }
+
+    protected <V> void initializeGettersAndSetters(final CtClass ctClass, final Map<String, Class<?>> fields,
+            final Class<T> classDef) throws CannotCompileException, NotFoundException {
         for (Method method : classDef.getMethods()) {
             final MethodBuilder mb = new MethodBuilder(method.getName());
             mb.addModifier("public");
@@ -93,8 +100,8 @@ public class StructureFactory<T> extends Factory<T> {
                     wasAnnotated = true;
 
                     final String fieldName = setterAnnotation.value();
-
-                    addField(ctClass, createdFields, param.getType(), fieldName);
+                    final Class<?> paramType = param.getType();
+                    verifyFieldType(fields, fieldName, paramType);
 
                     mb.addArgument(param);
                     mb.addBodyLine("this.%s = %s;", fieldName, param.getName());
@@ -106,11 +113,11 @@ public class StructureFactory<T> extends Factory<T> {
                 wasAnnotated = true;
 
                 final String fieldName = getterAnnotation.value();
+                final Class<?> returnType = method.getReturnType();
+                verifyFieldType(fields, fieldName, returnType);
 
-                addField(ctClass, createdFields, method.getReturnType(), fieldName);
-
-                mb.setReturnType(method.getReturnType());
-                mb.addBodyLine("return this.%s;", fieldName);
+                mb.setReturnType(returnType);
+                mb.addBodyLine("return this.%s;", getterAnnotation.value());
             }
 
             if (wasAnnotated) {
@@ -127,7 +134,9 @@ public class StructureFactory<T> extends Factory<T> {
             final CtClass ctClass = getClassPool().makeClass(createClassName(classDef));
             ctClass.addInterface(getClassPool().getCtClass(classDef.getName()));
 
-            initializeClass(ctClass, classDef);
+            final Map<String, Class<?>> fields = new HashMap<>();
+            initializeFields(ctClass, fields, classDef);
+            initializeGettersAndSetters(ctClass, fields, classDef);
 
             ctClass.detach();
             return ctClass.toClass(classDef);

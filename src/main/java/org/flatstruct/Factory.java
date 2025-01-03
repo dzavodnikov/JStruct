@@ -18,12 +18,28 @@ package org.flatstruct;
 import java.util.HashMap;
 import java.util.Map;
 
+import javassist.ClassPool;
+
 /**
  * Base class for all factories.
  */
 public abstract class Factory<T> {
 
-    protected abstract String getStructName();
+    private final ClassPool pool;
+
+    protected Factory(final ClassPool pool) {
+        this.pool = pool;
+    }
+
+    public Factory() {
+        this(ClassPool.getDefault());
+    }
+
+    public abstract String getFactoryName();
+
+    protected ClassPool getClassPool() {
+        return this.pool;
+    }
 
     /**
      * Cache of class implementations.
@@ -35,7 +51,17 @@ public abstract class Factory<T> {
      * @return class name of new structure.
      */
     protected String createClassName(final Class<T> classDef) {
-        return String.format("%s.%s_of_%s", classDef.getPackage().getName(), getStructName(), classDef.getSimpleName());
+        return String.format("%s.%s_of_%s", classDef.getPackage().getName(), getFactoryName(),
+                classDef.getSimpleName());
+    }
+
+    protected void verifyClassDefinition(final Class<T> classDef) {
+        if (classDef == null) {
+            throw new IllegalArgumentException("Class definition parameter should not be null");
+        }
+        if (!classDef.isInterface()) {
+            throw new IllegalArgumentException("Class definition parameter should be an interface");
+        }
     }
 
     /**

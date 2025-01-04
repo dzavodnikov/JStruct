@@ -16,6 +16,7 @@
 package org.flatstruct.example.structure;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.flatstruct.StructureFactory;
@@ -52,5 +53,56 @@ public class PersonTest {
         person.setAge(25);
         assertEquals("Jane Doe", person.getName());
         assertEquals(25, person.getAge());
+    }
+
+    @Test
+    void testEquals() {
+        final StructureFactory<Person> factory = new StructureFactory<>();
+
+        final Person person1 = factory.create(Person.class);
+        final Person person2 = factory.create(Person.class);
+        assertEquals(person1, person2);
+
+        person1.setName("John Doe");
+        assertNotEquals(person1, person2);
+
+        person2.setName("Jane Doe");
+        assertNotEquals(person1, person2);
+
+        person2.setName("John " + "Doe");
+        assertEquals(person1, person2);
+    }
+
+    @Test
+    void testHashCode() {
+        final StructureFactory<Person> factory = new StructureFactory<>();
+
+        final Person person1 = factory.create(Person.class);
+        final Person person2 = factory.create(Person.class);
+        assertEquals(person1.hashCode(), person2.hashCode());
+
+        person1.setName("John Doe");
+        assertNotEquals(person1, person2);
+
+        person2.setName("John Doe");
+        assertEquals(person1.hashCode(), person2.hashCode());
+    }
+
+    @Test
+    void testToString() {
+        final StructureFactory<Person> factory = new StructureFactory<>();
+        final Person person = factory.create(Person.class);
+
+        assertEquals("org.flatstruct.example.structure.Structure_of_Person [\n    name=null\n    age=0\n]",
+                person.toString());
+
+        final String name = "John Doe";
+        person.setName(name);
+        person.setAge(25);
+
+        final String str = String.format(
+                "org.flatstruct.example.structure.Structure_of_Person [\n    name=<%s>\n    age=25\n]",
+                name.hashCode());
+        assertEquals(str, person.toString());
     }
 }

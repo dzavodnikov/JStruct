@@ -135,17 +135,100 @@ public class StructureFactory<T> extends Factory<T> {
         }
     }
 
+    protected MethodBuilder initializeEquals(final String className, final Map<String, Class<?>> fields)
+            throws CannotCompileException, NotFoundException {
+        final MethodBuilder mb = new MethodBuilder("equals");
+        mb.addModifier("public");
+        mb.addArgument(Object.class, "obj");
+        mb.setReturnType(boolean.class);
+
+        mb.addBodyLine("if (null == obj) return false;");
+        mb.addBodyLine("if (this == obj) return true;");
+        mb.addBodyLine("if (getClass() != obj.getClass()) return false;");
+
+        mb.addBodyLine("%s struct = (%s) obj;", className, className);
+        for (String fieldName : fields.keySet()) {
+            if (fields.get(fieldName).isPrimitive()) {
+                mb.addBodyLine("if (this.%s != struct.%s) return false;", fieldName, fieldName);
+            } else {
+                mb.addBodyLine("if (this.%s != null) {", fieldName);
+                mb.addBodyLine("    if (!this.%s.equals(struct.%s)) return false;", fieldName, fieldName);
+                mb.addBodyLine("} else {");
+                mb.addBodyLine("    if (struct.%s != null) return false;", fieldName, fieldName);
+                mb.addBodyLine("}");
+            }
+        }
+        mb.addBodyLine("return true;");
+
+        return mb;
+    }
+
+    protected MethodBuilder initializeHashCode(final Map<String, Class<?>> fields)
+            throws CannotCompileException, NotFoundException {
+        final MethodBuilder mb = new MethodBuilder("hashCode");
+        mb.addModifier("public");
+        mb.setReturnType(int.class);
+
+        mb.addBodyLine("final int prime = 31;");
+        mb.addBodyLine("int result = 1;");
+        for (String fieldName : fields.keySet()) {
+            if (fields.get(fieldName).isPrimitive()) {
+                mb.addBodyLine("result = prime * result + (int) this.%s;", fieldName);
+            } else {
+                mb.addBodyLine("result = prime * result + ((this.%s == null) ? 0 : this.%s.hashCode());",
+                        fieldName, fieldName);
+            }
+        }
+        mb.addBodyLine("return result;");
+
+        return mb;
+    }
+
+    protected MethodBuilder initializeToString(final String className, final Map<String, Class<?>> fields)
+            throws CannotCompileException, NotFoundException {
+        final MethodBuilder mb = new MethodBuilder("toString");
+        mb.addModifier("public");
+        mb.setReturnType(String.class);
+
+        mb.addBodyLine("final StringBuilder sb = new StringBuilder();");
+        mb.addBodyLine("sb.append(\"%s [\\n\");", className);
+        for (String fieldName : fields.keySet()) {
+            mb.addBodyLine("sb.append(\"    %s=\");", fieldName);
+            if (fields.get(fieldName).isPrimitive()) {
+                mb.addBodyLine("sb.append(this.%s);", fieldName);
+            } else {
+                mb.addBodyLine("if (this.%s != null) {", fieldName);
+                mb.addBodyLine("    sb.append(\"<\");");
+                mb.addBodyLine("    sb.append(this.%s == null ? 'null' : ((Object) this.%s).hashCode());",
+                        fieldName, fieldName);
+                mb.addBodyLine("    sb.append(\">\");");
+                mb.addBodyLine("} else {");
+                mb.addBodyLine("    sb.append(\"null\");");
+                mb.addBodyLine("}");
+            }
+            mb.addBodyLine("sb.append(\"\\n\");");
+        }
+        mb.addBodyLine("sb.append(\"]\");");
+        mb.addBodyLine("return sb.toString();");
+
+        return mb;
+    }
+
     @Override
     public Class<?> createImpl(final Class<T> classDef) {
         verifyClassDefinition(classDef);
 
         try {
-            final CtClass ctClass = getClassPool().makeClass(createClassName(classDef));
+            final String newClassName = createClassName(classDef);
+            final CtClass ctClass = getClassPool().makeClass(newClassName);
             ctClass.addInterface(getClassPool().getCtClass(classDef.getName()));
 
             final Map<String, Class<?>> fields = new HashMap<>();
             initializeFields(ctClass, fields, classDef);
             initializeGettersAndSetters(ctClass, fields, classDef);
+            initializeEquals(newClassName, fields).addMethodTo(ctClass);
+            initializeHashCode(fields).addMethodTo(ctClass);
+            initializeToString(newClassName, fields).addMethodTo(ctClass);
 
             ctClass.detach();
             return ctClass.toClass(classDef);

@@ -31,4 +31,10 @@ public @interface Getter {
      * @return name of the field.
      */
     String value();
+
+    /**
+     * @return <code>true</code> if method should have <code>synchronized</code>
+     *         modifier.
+     */
+    boolean isSynchronized() default false;
 }

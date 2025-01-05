@@ -104,7 +104,12 @@ public class StructureFactory<T> extends Factory<T> {
                     verifyFieldType(fields, fieldName, paramType);
 
                     mb.addArgument(param);
-                    mb.addBodyLine("this.%s = %s;", fieldName, param.getName());
+
+                    String body = "this.%s = %s;";
+                    if (setterAnnotation.isSynchronized()) {
+                        body = String.format("synchronized(this) { %s }", body);
+                    }
+                    mb.addBodyLine(body, fieldName, param.getName());
                 }
             }
 
@@ -115,6 +120,10 @@ public class StructureFactory<T> extends Factory<T> {
                 final String fieldName = getterAnnotation.value();
                 final Class<?> returnType = method.getReturnType();
                 verifyFieldType(fields, fieldName, returnType);
+
+                if (getterAnnotation.isSynchronized()) {
+                    mb.addModifier("synchronized");
+                }
 
                 mb.setReturnType(returnType);
                 mb.addBodyLine("return this.%s;", getterAnnotation.value());

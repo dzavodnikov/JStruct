@@ -40,9 +40,11 @@ public interface Point2D {
     @Getter(Y_FIELD_NAME)
     int getY();
 
-    @Getter(X_FIELD_NAME)
-    int setXY(@Setter(X_FIELD_NAME) int x, @Setter(Y_FIELD_NAME) int y);
+    @Getter(value = X_FIELD_NAME, isSynchronized = true)
+    int setXY(@Setter(value = X_FIELD_NAME, isSynchronized = true) int x,
+            @Setter(value = Y_FIELD_NAME, isSynchronized = true) int y);
 
-    @Getter(Y_FIELD_NAME)
-    int setYX(@Setter(Y_FIELD_NAME) int y, @Setter(X_FIELD_NAME) int x);
+    @Getter(value = Y_FIELD_NAME, isSynchronized = true)
+    int setYX(@Setter(value = Y_FIELD_NAME, isSynchronized = true) int y,
+            @Setter(value = X_FIELD_NAME, isSynchronized = true) int x);
 }

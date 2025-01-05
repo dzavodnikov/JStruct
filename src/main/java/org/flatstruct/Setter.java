@@ -31,4 +31,10 @@ public @interface Setter {
      * @return name of the field.
      */
     String value();
+
+    /**
+     * @return <code>true</code> if code that write data to the field should have
+     *         <code>synchronized</code> wrapper.
+     */
+    boolean isSynchronized() default false;
 }
